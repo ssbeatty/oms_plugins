@@ -65,6 +65,32 @@ func runCommand(c *transport.Client, cmd string, sudo bool) ([]byte, error) {
 	return output, nil
 }
 
+func runCommandNoPty(c *transport.Client, cmd string, sudo bool) ([]byte, error) {
+
+	var (
+		output []byte
+		err    error
+	)
+
+	session, err := c.NewSession()
+	if err != nil {
+		return nil, err
+	}
+
+	defer session.Close()
+
+	if sudo {
+		output, err = session.Sudo(cmd, c.Conf.Password)
+	} else {
+		output, err = session.Output(cmd)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return output, nil
+}
+
 func getOsReleaseVersion(c *transport.Client) (string, error) {
 	output, err := runCommand(c, "cat /etc/os-release", false)
 	if err != nil {
@@ -80,7 +106,7 @@ func getOsReleaseVersion(c *transport.Client) (string, error) {
 
 func ubuntuInstallVnc(c *transport.Client) error {
 	fmt.Println("开始安装依赖...")
-	output, err := runCommand(c, "DEBIAN_FRONTEND=noninteractive dpkg -i .oms/ubuntu/*.deb", true)
+	output, err := runCommandNoPty(c, "DEBIAN_FRONTEND=noninteractive dpkg -i .oms/ubuntu/*.deb", true)
 	if err != nil {
 		return err
 	}
@@ -178,6 +204,7 @@ func pluginExec(args []string) {
 		_, _ = fmt.Fprintf(os.Stderr, "解析发行版出错, err: %v", err)
 		os.Exit(-1)
 	}
+	fmt.Println("开始上传文件...")
 
 	err = c.UploadFile(
 		fmt.Sprintf("files/%s.zip", release), fmt.Sprintf(".oms/%s.zip", release), "")
