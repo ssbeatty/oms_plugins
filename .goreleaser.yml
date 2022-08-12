@@ -1,0 +1,27 @@
+project_name: "vnc_install"
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - binary: vnc_install
+    id: vnc_install
+    main: main.go
+    ldflags:
+      - -s -w
+    goos:
+      - windows
+      - darwin
+      - linux
+      - freebsd
+    goarch:
+      - amd64
+
+archives:
+  -
+    name_template: "{{.Os}}-{{.Arch}}{{if .Arm}}v{{.Arm}}{{end}}-{{ .ProjectName }}"
+    format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - files
