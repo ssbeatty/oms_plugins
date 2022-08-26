@@ -28,13 +28,16 @@ var execCmd = &cobra.Command{
 const TemplateService = `[Unit]
 Description=x11vnc service
 After=display-manager.service network.target syslog.target
+StartLimitBurst=2
+StartLimitIntervalSec=150s
 
 [Service]
 User=root
-Type=simple
+Type=idle
 ExecStart=/usr/bin/x11vnc -forever -display :%d -auth %s %s
 ExecStop=/usr/bin/killall x11vnc
 Restart=on-failure
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target`
@@ -99,6 +102,8 @@ func getOsReleaseVersion(c *transport.Client) (string, error) {
 
 	if strings.Contains(string(output), "Ubuntu") {
 		return "ubuntu", nil
+	} else if strings.Contains(string(output), "CentOS Linux 7") {
+		return "centos7", nil
 	} else {
 		return "", errors.New("不支持的发行版")
 	}
@@ -106,21 +111,19 @@ func getOsReleaseVersion(c *transport.Client) (string, error) {
 
 func ubuntuInstallVnc(c *transport.Client) error {
 	fmt.Println("开始安装依赖...")
-	output, err := runCommandNoPty(c, "DEBIAN_FRONTEND=noninteractive dpkg -i .oms/ubuntu/*.deb", true)
+	_, err := runCommandNoPty(c, "DEBIAN_FRONTEND=noninteractive dpkg -i .oms/ubuntu/*.deb", true)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println(string(output))
+	fmt.Println("指定lightdm默认图形界面")
 
-	fmt.Println("指定lightdm默认")
-
-	output, err = runCommand(c, "bash -c 'echo \"/usr/sbin/lightdm\" > /etc/X11/default-display-manager'", true)
+	_, err = runCommand(c, "bash -c 'echo \"/usr/sbin/lightdm\" > /etc/X11/default-display-manager'", true)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("指定lightdm默认成功")
+	fmt.Println("指定lightdm默认图形界面成功")
 
 	return nil
 }
@@ -162,7 +165,6 @@ func registerService(c *transport.Client, params Params) error {
 
 func clear(c *transport.Client) {
 	_, _ = runCommand(c, "rm -rf .oms", false)
-
 }
 
 func pluginExec(args []string) {
@@ -222,6 +224,13 @@ func pluginExec(args []string) {
 
 	fmt.Println(string(output))
 
+	switch release {
+	case "ubuntu":
+		err = ubuntuInstallVnc(c)
+	default:
+		_, _ = fmt.Fprintf(os.Stderr, "暂不支持发行版: %s\n", release)
+		os.Exit(-1)
+	}
 	err = ubuntuInstallVnc(c)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "安装失败, err: %v", err)
@@ -234,11 +243,11 @@ func pluginExec(args []string) {
 		os.Exit(-1)
 	}
 
-	defer clear(c)
+	fmt.Println("注册服务成功, 开始清理缓存...")
 
-	_, err = runCommand(c, "reboot", true)
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "重启失败, err: %v", err)
-		os.Exit(-1)
-	}
+	clear(c)
+
+	fmt.Println("重启...")
+
+	_, _ = runCommand(c, "reboot", true)
 }
