@@ -25,6 +25,10 @@ var execCmd = &cobra.Command{
 	},
 }
 
+func printMsg(msg string) {
+	fmt.Fprintf(os.Stdout, "%s\r\n", msg)
+}
+
 const TemplateService = `[Unit]
 Description=x11vnc service
 After=display-manager.service network.target syslog.target
@@ -110,20 +114,31 @@ func getOsReleaseVersion(c *transport.Client) (string, error) {
 }
 
 func ubuntuInstallVnc(c *transport.Client) error {
-	fmt.Println("开始安装依赖...")
+	printMsg("开始安装依赖...")
 	_, err := runCommandNoPty(c, "DEBIAN_FRONTEND=noninteractive dpkg -i .oms/ubuntu/*.deb", true)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("指定lightdm默认图形界面")
+	printMsg("指定lightdm默认图形界面")
 
+	// https://askubuntu.com/questions/1114525/reconfigure-the-display-manager-non-interactively
 	_, err = runCommand(c, "bash -c 'echo \"/usr/sbin/lightdm\" > /etc/X11/default-display-manager'", true)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("指定lightdm默认图形界面成功")
+	_, err = runCommand(c, "DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true dpkg-reconfigure lightdm", true)
+	if err != nil {
+		return err
+	}
+
+	_, err = runCommand(c, "bash -c 'echo \"set shared/default-x-display-manager lightdm\" | debconf-communicate'", true)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("指定lightdm默认图形界面成功\r\n")
 
 	return nil
 }
@@ -158,7 +173,7 @@ func registerService(c *transport.Client, params Params) error {
 		return err
 	}
 
-	fmt.Println(string(output))
+	printMsg(string(output))
 
 	return nil
 }
@@ -175,79 +190,79 @@ func pluginExec(args []string) {
 
 	err := json.Unmarshal([]byte(clients), &client)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "解析ssh参数出错, err: %v", err)
+		fmt.Fprintf(os.Stderr, "解析ssh参数出错, err: %v\r\n", err)
 		os.Exit(-1)
 	}
 	err = json.Unmarshal([]byte(params), &param)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "解析plugin参数出错, err: %v", err)
+		fmt.Fprintf(os.Stderr, "解析plugin参数出错, err: %v\r\n", err)
 		os.Exit(-1)
 	}
 
 	c, err := transport.New(client.Host, client.User, client.Password, client.Passphrase, client.KeyBytes, client.Port)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "创建ssh客户端出错, err: %v", err)
+		_, _ = fmt.Fprintf(os.Stderr, "创建ssh客户端出错, err: %v\r\n", err)
 		os.Exit(-1)
 	}
 
 	if c.GetTargetMachineOs() == transport.GOOSWindows {
-		_, _ = fmt.Fprintf(os.Stderr, "暂不支持windows")
+		_, _ = fmt.Fprintf(os.Stderr, "暂不支持windows\r\n")
 		os.Exit(-1)
 	}
 
 	err = c.NewSftpClient()
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "创建sftp客户端出错, err: %v", err)
+		_, _ = fmt.Fprintf(os.Stderr, "创建sftp客户端出错, err: %v\r\n", err)
 		os.Exit(-1)
 	}
 
 	release, err := getOsReleaseVersion(c)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "解析发行版出错, err: %v", err)
+		_, _ = fmt.Fprintf(os.Stderr, "解析发行版出错, err: %v\r\n", err)
 		os.Exit(-1)
 	}
-	fmt.Println("开始上传文件...")
+	printMsg("开始上传文件...")
 
 	err = c.UploadFile(
 		fmt.Sprintf("files/%s.zip", release), fmt.Sprintf(".oms/%s.zip", release), "")
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "上传文件出错, err: %v", err)
+		_, _ = fmt.Fprintf(os.Stderr, "上传文件出错, err: %v\r\n", err)
 		os.Exit(-1)
 	}
-	fmt.Println("上传文件成功")
+	printMsg("上传文件成功")
 
 	output, err := runCommand(c, fmt.Sprintf("unzip -o -d .oms .oms/%s.zip", release), false)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "解压失败, err: %v, ouput: %s", err, output)
+		_, _ = fmt.Fprintf(os.Stderr, "解压失败, err: %v, ouput: %s\r\n", err, output)
 		os.Exit(-1)
 	}
 
-	fmt.Println(string(output))
+	printMsg(string(output))
 
 	switch release {
 	case "ubuntu":
 		err = ubuntuInstallVnc(c)
 	default:
-		_, _ = fmt.Fprintf(os.Stderr, "暂不支持发行版: %s\n", release)
+		_, _ = fmt.Fprintf(os.Stderr, "暂不支持发行版: %s\r\n", release)
 		os.Exit(-1)
 	}
 	err = ubuntuInstallVnc(c)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "安装失败, err: %v", err)
+		_, _ = fmt.Fprintf(os.Stderr, "安装失败, err: %v\r\n", err)
 		os.Exit(-1)
 	}
 
 	err = registerService(c, param)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "注册服务失败, err: %v", err)
+		_, _ = fmt.Fprintf(os.Stderr, "注册服务失败, err: %v\r\n", err)
 		os.Exit(-1)
 	}
 
-	fmt.Println("注册服务成功, 开始清理缓存...")
+	printMsg("注册服务成功, 开始清理缓存...")
 
 	clear(c)
 
-	fmt.Println("重启...")
+	printMsg("重启...")
 
 	_, _ = runCommand(c, "reboot", true)
 }
