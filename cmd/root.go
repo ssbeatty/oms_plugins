@@ -12,8 +12,8 @@ var (
 
 type Params struct {
 	VNCPassWord string `json:"vnc_pass_word" jsonschema:"required=true" jsonschema_description:"VNC密码"`
-	VNCDisplay  int    `json:"vnc_display"  jsonschema:"required=true" jsonschema_description:"VNC Display Port"`
-	Auth        string `json:"auth" jsonschema:"required=true" jsonschema_description:"VNC Auth, Default guess"`
+	VNCDisplay  int    `json:"vnc_display"  jsonschema:"required=true,default=0" jsonschema_description:"VNC Display Port, 默认: 0"`
+	Auth        string `json:"auth" jsonschema:"required=true,default=guess" jsonschema_description:"VNC Auth, Default guess"`
 }
 
 type ClientConfig struct {
