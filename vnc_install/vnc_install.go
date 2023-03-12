@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/ssbeatty/oms/pkg/transport"
 	"github.com/ssbeatty/oms/pkg/types"
+	"os"
 	"strings"
 )
 
@@ -26,6 +27,10 @@ Restart=on-failure
 RestartSec=10
 [Install]
 WantedBy=multi-user.target`
+)
+
+var (
+	PluginPath = os.Getenv("PLUGIN_PATH")
 )
 
 func New() types.Step {
@@ -253,9 +258,8 @@ func (bs *VNCInstallStep) pluginExec(c *transport.Client) error {
 	}
 	bs.printMsg("开始上传文件...")
 
-	// todo how to get path
 	err = c.UploadFile(
-		fmt.Sprintf("data/plugin/data/vnc_install/files/%s.zip", release), fmt.Sprintf(".oms/%s.zip", release), "")
+		fmt.Sprintf("%s/src/vnc_install/files/%s.zip", PluginPath, release), fmt.Sprintf(".oms/%s.zip", release), "")
 	if err != nil {
 		return err
 	}
