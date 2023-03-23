@@ -10,7 +10,7 @@ vnc_install              # 可以自动在目标机器安装x11vnc
 ```
 
 ## 原理
-基于https://github.com/traefik/yaegi实现的go代码动态解释
+基于https://github.com/traefik/yaegi  实现的go代码动态解释
 
 > 怎么安装？
 1. 将插件目录zip或者tar.gz打包在界面上上传
